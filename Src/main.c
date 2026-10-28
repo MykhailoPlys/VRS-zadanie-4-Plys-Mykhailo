@@ -59,7 +59,7 @@ int main(void)
 
   /* Space for your local variables, callback registration ...*/
 
-  	  //type your code here:
+  USART2_RegisterCallback(proccesDmaData);
 
   while (1)
   {
