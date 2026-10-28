@@ -23,6 +23,8 @@
 #include "dma.h"
 #include "usart.h"
 #include "gpio.h"
+#include <stdio.h>
+#include <string.h>
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -38,7 +40,17 @@ void proccesDmaData(uint8_t sign);
 
 /* Space for your global variables. */
 
-	// type your global variables here:
+#define TEXT_LENGTH 35
+#define RESULT_COUNT 16
+
+static letter_count_ letterCount;
+static struct
+{
+	char text[TEXT_LENGTH + 1];
+	letter_count_ letters;
+} results[RESULT_COUNT];
+static volatile uint8_t readyResults;
+volatile uint32_t milliseconds;
 
 
 int main(void)
@@ -59,7 +71,11 @@ int main(void)
 
   /* Space for your local variables, callback registration ...*/
 
-  	  //type your code here:
+  USART2_RegisterCallback(proccesDmaData);
+  static uint8_t txMessage[128];
+  uint8_t nextResult = 0;
+  uint32_t lastStatus = 0;
+  LL_SYSTICK_EnableIT();
 
   while (1)
   {
@@ -75,7 +91,46 @@ int main(void)
 	   * Example message (what I wish to see in terminal) - Valid string: Platn15uborZnakov, lower-case: 13, upper-case: 2
 	   */
 
-  	  	  	  //type your code here:
+	  if(nextResult == readyResults)
+	  {
+		  uint32_t mask = __get_PRIMASK();
+		  __disable_irq();
+		  if(nextResult == readyResults)
+		  {
+			  nextResult = 0;
+			  readyResults = 0;
+		  }
+		  __set_PRIMASK(mask);
+	  }
+
+	  if(!LL_DMA_IsEnabledChannel(DMA1, LL_DMA_CHANNEL_7))
+	  {
+		  int length = 0;
+		  uint32_t now = milliseconds;
+		  if((uint32_t)(now - lastStatus) >= 2000)
+		  {
+			  uint32_t occupied = DMA_USART2_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_6);
+			  uint32_t load = (occupied * 1000 + DMA_USART2_BUFFER_SIZE / 2) / DMA_USART2_BUFFER_SIZE;
+			  length = snprintf((char *)txMessage, sizeof(txMessage),
+					  "Buffer capacity: %u bytes, occupied memory: %u bytes, load [in %%]: %u.%u%%\r\n",
+					  (unsigned int)DMA_USART2_BUFFER_SIZE, (unsigned int)occupied,
+					  (unsigned int)(load / 10), (unsigned int)(load % 10));
+			  lastStatus = now;
+		  }
+		  else if(nextResult < readyResults)
+		  {
+			  __DMB();
+			  length = snprintf((char *)txMessage, sizeof(txMessage),
+					  "Valid string: %s, lower-case: %u, upper-case: %u\r\n",
+					  results[nextResult].text, (unsigned int)results[nextResult].letters.small_letter,
+					  (unsigned int)results[nextResult].letters.capital_letter);
+			  nextResult++;
+		  }
+		  if(length > 0 && (size_t)length < sizeof(txMessage))
+		  {
+			  USART2_PutBuffer(txMessage, (uint8_t)length);
+		  }
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -119,7 +174,54 @@ void proccesDmaData(uint8_t sign)
 {
 	/* Process received data */
 
-		// type your algorithm here:
+	static char text[TEXT_LENGTH + 1];
+	static uint8_t length = 0;
+	static uint8_t started = 0;
+
+	if(!started)
+	{
+		if(sign == '#')
+		{
+			started = 1;
+			length = 0;
+			letterCount.small_letter = 0;
+			letterCount.capital_letter = 0;
+		}
+		return;
+	}
+
+	if(sign == '$')
+	{
+		text[length] = '\0';
+		uint8_t slot = readyResults;
+		if(slot < RESULT_COUNT)
+		{
+			memcpy(results[slot].text, text, length + 1);
+			results[slot].letters = letterCount;
+			__DMB();
+			readyResults = slot + 1;
+		}
+		started = 0;
+		return;
+	}
+
+	if(length == TEXT_LENGTH)
+	{
+		started = 0;
+		letterCount.small_letter = 0;
+		letterCount.capital_letter = 0;
+		return;
+	}
+
+	text[length++] = sign;
+	if(sign >= 'a' && sign <= 'z')
+	{
+		letterCount.small_letter++;
+	}
+	else if(sign >= 'A' && sign <= 'Z')
+	{
+		letterCount.capital_letter++;
+	}
 }
 
 

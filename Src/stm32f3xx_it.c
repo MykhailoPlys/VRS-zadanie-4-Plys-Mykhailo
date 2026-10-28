@@ -59,6 +59,7 @@
 /* External variables --------------------------------------------------------*/
 
 /* USER CODE BEGIN EV */
+extern volatile uint32_t milliseconds;
 
 /* USER CODE END EV */
 
@@ -183,6 +184,7 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
+  milliseconds++;
 
   /* USER CODE END SysTick_IRQn 0 */
   
@@ -205,13 +207,13 @@ void DMA1_Channel6_IRQHandler(void)
 {
 	if(LL_DMA_IsActiveFlag_TC6(DMA1) == SET)
 	{
-		USART2_CheckDmaReception();
 		LL_DMA_ClearFlag_TC6(DMA1);
+		USART2_CheckDmaReception();
 	}
 	else if(LL_DMA_IsActiveFlag_HT6(DMA1) == SET)
 	{
-		USART2_CheckDmaReception();
 		LL_DMA_ClearFlag_HT6(DMA1);
+		USART2_CheckDmaReception();
 	}
 }
 
@@ -224,7 +226,6 @@ void DMA1_Channel7_IRQHandler(void)
 	{
 		LL_DMA_ClearFlag_TC7(DMA1);
 
-		while(LL_USART_IsActiveFlag_TC(USART2) == RESET);
 		LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_7);
 	}
 }
@@ -236,8 +237,8 @@ void USART2_IRQHandler(void)
 {
 	if(LL_USART_IsActiveFlag_IDLE(USART2))
 	{
-		USART2_CheckDmaReception();
 		LL_USART_ClearFlag_IDLE(USART2);
+		USART2_CheckDmaReception();
 	}
 }
 /* USER CODE BEGIN 1 */
