@@ -90,7 +90,18 @@ void MX_USART2_UART_Init(void)
 
   /* USART2_TX Init */
 
-	  // type DMA USART Tx configuration here
+  LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_7);
+  LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_7, LL_USART_DMA_GetRegAddr(USART2, LL_USART_DMA_REG_DATA_TRANSMIT));
+  LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_7, 0);
+  LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_7, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MODE_NORMAL);
+  LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_7, LL_DMA_PERIPH_NOINCREMENT);
+  LL_DMA_SetMemoryIncMode(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MEMORY_INCREMENT);
+  LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_7, LL_DMA_PDATAALIGN_BYTE);
+  LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MDATAALIGN_BYTE);
+  LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_7, 0);
+  LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_7, LL_DMA_PRIORITY_MEDIUM);
+  LL_DMA_ClearFlag_GI7(DMA1);
 
 
   /* USART2 interrupt Init */
@@ -111,6 +122,7 @@ void MX_USART2_UART_Init(void)
   /* Enable USART2 peripheral and interrupts*/
 
   LL_USART_EnableDMAReq_RX(USART2);
+  LL_USART_EnableDMAReq_TX(USART2);
   LL_USART_EnableIT_IDLE(USART2);
   LL_USART_ClearFlag_IDLE(USART2);
   LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_6);
@@ -121,12 +133,19 @@ void MX_USART2_UART_Init(void)
 // Send data stored in buffer with DMA
 void USART2_PutBuffer(uint8_t *buffer, uint8_t length)
 {
+	if(buffer == 0 || length == 0 || LL_DMA_IsEnabledChannel(DMA1, LL_DMA_CHANNEL_7))
+	{
+		return;
+	}
+
+	LL_DMA_ClearFlag_GI7(DMA1);
 	LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_7, (uint32_t)buffer);
 
 	LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_7, length);
 
 	LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_7);
 
+	__DMB();
 	LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_7);
 }
 
